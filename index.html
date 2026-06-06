@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>SVGM — Onchain SVG Minter · Demo</title>
+<meta name="description" content="Interactive demo of the Onchain SVG Minter (SVGM) skill — generate, validate, and mint fully-onchain SVG NFTs on Pharos Network." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232F80ED'/%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-family='ui-sans-serif,system-ui' font-size='16' font-weight='700' fill='white'%3ES%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --bg-2: #141414;
+    --bg-3: #1A1A1A;
+    --line: #262626;
+    --line-2: #333333;
+    --text: #F5F5F5;
+    --text-2: #B3B3B3;
+    --text-3: #808080;
+    --accent: #2F80ED;
+    --accent-2: #5BA0F5;
+    --good: #06D6A0;
+    --warn: #FFB020;
+    --bad:  #F25C5C;
+    --code-bg: #0A0A0A;
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, .mono { font-family: var(--mono); }
+
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(13,13,13,0.85); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { max-width: 1100px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: white; font-size: 14px; font-weight: 800; }
+  .nav-links { display: flex; gap: 20px; margin-left: auto; align-items: center; flex-wrap: wrap; }
+  .nav-links a { color: var(--text-2); font-size: 14px; }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--text-2); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+  .pill.mainnet .dot { background: var(--accent); }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero { padding: 72px 0 48px; }
+  .hero h1 { font-size: 52px; line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 18px; font-weight: 800; }
+  .hero h1 .accent { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p.lede { font-size: 18px; line-height: 1.6; color: var(--text-2); max-width: 720px; margin: 0 0 28px; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease; text-decoration: none; }
+  .btn.primary { background: var(--accent); color: white; }
+  .btn.primary:hover { background: var(--accent-2); text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--text); border-color: var(--line-2); }
+  .btn.ghost:hover { border-color: var(--text-3); text-decoration: none; }
+
+  .meta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .meta { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; color: var(--text-2); }
+  .meta b { color: var(--text); font-weight: 600; }
+
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  section h2 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  section .sub { color: var(--text-2); margin: 0 0 32px; font-size: 15px; }
+
+  /* Network table */
+  .net-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg-2); }
+  .net-table th, .net-table td { padding: 12px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--line); }
+  .net-table th { background: var(--bg-3); color: var(--text-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .net-table tr:last-child td { border-bottom: none; }
+  .net-table td.mono { font-family: var(--mono); font-size: 13px; color: var(--text-2); }
+  .tag-default { display: inline-block; padding: 2px 8px; background: rgba(47,128,237,0.15); color: var(--accent-2); border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  .tag-add { display: inline-block; padding: 2px 8px; background: var(--bg-3); color: var(--text-2); border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+
+  /* Generator card */
+  .card { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } .hero h1 { font-size: 36px; } }
+
+  .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .form-row label { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .form-row input, .form-row select, .form-row textarea {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 6px;
+    padding: 9px 12px; font-size: 14px; font-family: var(--mono); outline: none; transition: border-color 0.15s ease;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent); }
+  .form-row .hint { font-size: 12px; color: var(--text-3); }
+
+  .preview {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    aspect-ratio: 1 / 1;
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  .preview svg { width: 100%; height: 100%; display: block; }
+
+  .status { margin-top: 12px; padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; font-family: var(--mono); white-space: pre-wrap; word-break: break-word; }
+  .status.ok { background: rgba(6,214,160,0.08); border: 1px solid rgba(6,214,160,0.3); color: var(--good); }
+  .status.bad { background: rgba(242,92,92,0.08); border: 1px solid rgba(242,92,92,0.3); color: var(--bad); }
+  .status .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .status .row span { white-space: nowrap; }
+
+  /* Workflow simulator */
+  .workflow { display: grid; gap: 16px; }
+  .step { background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .step-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
+  .step-head:hover { background: var(--bg-3); }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: white; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .step-num.done { background: var(--good); }
+  .step-title { font-weight: 600; font-size: 15px; }
+  .step-sub { color: var(--text-2); font-size: 13px; margin-left: auto; font-family: var(--mono); }
+  .step-body { display: none; padding: 0; }
+  .step.open .step-body { display: block; }
+  .step.open .step-sub { display: none; }
+  .step-body pre { margin: 0; padding: 16px 18px; background: var(--code-bg); color: var(--text-2); font-size: 12.5px; line-height: 1.55; overflow-x: auto; }
+  .step-body pre .k { color: var(--accent-2); }
+  .step-body pre .s { color: var(--good); }
+  .step-body pre .c { color: var(--text-3); }
+  .step-body pre .n { color: var(--warn); }
+  .run-btn { margin: 14px 18px 18px; }
+
+  /* API table */
+  .api-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .api-table th, .api-table td { padding: 10px 14px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .api-table th { background: var(--bg-3); color: var(--text-2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .api-table td.mono { font-family: var(--mono); color: var(--accent-2); font-size: 12.5px; }
+  .api-table tr:last-child td { border-bottom: none; }
+
+  /* Footer */
+  footer { padding: 40px 0; border-top: 1px solid var(--line); color: var(--text-2); font-size: 13px; }
+  footer a { color: var(--text); }
+  .footer-grid { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: center; }
+  .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+
+  .gh-banner {
+    display: flex; align-items: center; gap: 14px; padding: 16px 20px;
+    background: linear-gradient(90deg, rgba(47,128,237,0.08), rgba(47,128,237,0.02));
+    border: 1px solid rgba(47,128,237,0.25); border-radius: var(--radius);
+    margin: 0 0 24px;
+  }
+  .gh-icon { width: 28px; height: 28px; flex-shrink: 0; }
+  .gh-banner .txt { flex: 1; }
+  .gh-banner .txt b { color: var(--text); }
+  .gh-banner .txt div { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">S</span>
+      <span>SVGM</span>
+    </a>
+    <div class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#network">Network</a>
+      <a href="#playground">Playground</a>
+      <a href="#workflow">Agent Workflow</a>
+      <a href="#api">Contract API</a>
+      <span class="pill mainnet"><span class="dot"></span> Pharos Mainnet · 1672</span>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="wrap">
+      <h1>Onchain SVG Minter <span class="accent">SVGM</span></h1>
+      <p class="lede">
+        A portable agent skill for generating, validating, and minting
+        <b>fully-onchain SVG NFTs</b> on the Pharos Network — no IPFS, no
+        external hosting, no broken art links. Everything lives in the
+        contract's <code>tokenURI</code> and renders as a single base64
+        <code>data:</code> URI.
+      </p>
+
+      <div class="cta-row">
+        <a class="btn primary" href="#playground">▶ Try the live generator</a>
+        <a class="btn ghost" href="https://github.com/Yemiight02/SVGM" target="_blank" rel="noopener">View source on GitHub →</a>
+        <a class="btn ghost" href="https://github.com/Yemiight02/SVGM/blob/main/skills/svgm/SKILL.md" target="_blank" rel="noopener">SKILL.md</a>
+      </div>
+
+      <div class="meta-row">
+        <span class="meta"><b>Network</b> · Pharos Mainnet (chain 1672)</span>
+        <span class="meta"><b>Standard</b> · ERC-721 + onchain metadata</span>
+        <span class="meta"><b>Stack</b> · Solidity 0.8.24 · OpenZeppelin v5 · viem 2</span>
+        <span class="meta"><b>License</b> · MIT</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="overview">
+    <div class="wrap">
+      <h2>What it does</h2>
+      <p class="sub">Three steps, all onchain, all reproducible by an AI agent.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 style="margin:0 0 8px; font-size:17px;">① Generate</h3>
+          <p style="margin:0; color:var(--text-2); font-size:14px; line-height:1.6;">
+            Deterministic SVG generator. Same seed → same artwork. The agent
+            passes shapes, palette, and a seed; the skill returns a
+            well-formed SVG string.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px; font-size:17px;">② Validate</h3>
+          <p style="margin:0; color:var(--text-2); font-size:14px; line-height:1.6;">
+            Strips <code>&lt;script&gt;</code> tags, <code>javascript:</code>
+            URIs, and <code>on*=</code> event handlers. Enforces a 24 KB
+            cap so every mint fits comfortably inside a Pharos block.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px; font-size:17px;">③ Mint</h3>
+          <p style="margin:0; color:var(--text-2); font-size:14px; line-height:1.6;">
+            Calls <code>OnchainSVG.mint(to, svg)</code> via viem. The
+            contract stores the SVG, builds a base64 JSON, and returns it
+            from <code>tokenURI</code>. The agent never touches a host.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin:0 0 8px; font-size:17px;">④ Read</h3>
+          <p style="margin:0; color:var(--text-2); font-size:14px; line-height:1.6;">
+            <code>read-token.ts</code> decodes the onchain
+            <code>tokenURI</code> into a JSON metadata object and a
+            ready-to-render <code>data:image/svg+xml;base64,…</code> image.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="network">
+    <div class="wrap">
+      <h2>Network</h2>
+      <p class="sub">All onchain actions default to Pharos Mainnet. Testnet is supported as an additional option.</p>
+      <table class="net-table">
+        <thead>
+          <tr>
+            <th>Network</th>
+            <th>Chain ID</th>
+            <th>RPC</th>
+            <th>Explorer</th>
+            <th>Currency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Pharos Mainnet <span class="tag-default">DEFAULT</span></td>
+            <td class="mono">1672</td>
+            <td class="mono">https://rpc.pharos.xyz</td>
+            <td class="mono">https://pharosscan.xyz</td>
+            <td class="mono">PROS</td>
+          </tr>
+          <tr>
+            <td>Pharos Atlantic Testnet <span class="tag-add">ADDITIONAL</span></td>
+            <td class="mono">688688</td>
+            <td class="mono">https://atlantic.dplabs-internal.com</td>
+            <td class="mono">https://testnet.pharosscan.xyz</td>
+            <td class="mono">PROS</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="playground">
+    <div class="wrap">
+      <h2>Playground</h2>
+      <p class="sub">Run the same generator the agent uses. Adjust shapes, palette, and seed; the SVG is regenerated live. No transactions are sent from this page.</p>
+
+      <div class="card">
+        <div class="grid-2">
+          <div>
+            <div class="form-row">
+              <label>Shapes (comma-separated)</label>
+              <input id="shapes" value="circle,rect,polygon" />
+              <div class="hint">circle · rect · polygon · line · path</div>
+            </div>
+            <div class="form-row">
+              <label>Palette (hex colors, comma-separated)</label>
+              <input id="palette" value="#2F80ED,#0D0D0D,#F5F5F5,#FFD166,#06D6A0" />
+            </div>
+            <div class="form-row">
+              <label>Seed</label>
+              <input id="seed" type="number" value="42" />
+            </div>
+            <div class="form-row">
+              <label>Size (px)</label>
+              <input id="size" type="number" value="384" min="64" max="1024" step="32" />
+            </div>
+            <div class="form-row">
+              <label>Background</label>
+              <input id="bg" value="#0D0D0D" />
+            </div>
+            <button class="btn primary" id="genBtn" style="width:100%; justify-content:center;">Regenerate</button>
+            <div id="status" class="status ok" style="margin-top:14px;">Ready.</div>
+          </div>
+          <div>
+            <div class="preview" id="preview" aria-label="Generated SVG preview"></div>
+            <div class="form-row" style="margin-top:14px; margin-bottom:0;">
+              <label>SVG output (UTF-8, first 240 chars)</label>
+              <textarea id="svgOut" rows="4" readonly style="resize:vertical;"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="workflow">
+    <div class="wrap">
+      <h2>Agent Workflow</h2>
+      <p class="sub">A real agent runs this exact 4-step sequence when the user says "mint an onchain SVG NFT on Pharos." Click any step to expand the simulated viem call.</p>
+
+      <div class="workflow">
+        <div class="step open" data-step="1">
+          <div class="step-head" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div>
+              <div class="step-title">Generate SVG</div>
+              <div class="step-sub">shapes=[circle,rect] · palette=[#2F80ED,#0D0D0D] · seed=42</div>
+            </div>
+          </div>
+          <div class="step-body">
+<pre><span class="c">// agent/scripts/generate-svg.ts</span>
+<span class="k">import</span> { generateSVG } <span class="k">from</span> <span class="s">"./agent/scripts/generate-svg"</span>;
+
+<span class="k">const</span> svg = <span class="k">await</span> generateSVG({
+  shapes:  [<span class="s">"circle"</span>, <span class="s">"rect"</span>, <span class="s">"polygon"</span>],
+  palette: [<span class="s">"#2F80ED"</span>, <span class="s">"#0D0D0D"</span>, <span class="s">"#F5F5F5"</span>],
+  seed:    <span class="n">42</span>,
+  size:    <span class="n">512</span>,
+});
+<span class="c">// → "&lt;?xml version="1.0"...&lt;svg xmlns="http://www.w3.org/2000/svg"...&gt;"</span></pre>
+          </div>
+        </div>
+
+        <div class="step" data-step="2">
+          <div class="step-head" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div>
+              <div class="step-title">Validate (size + safety)</div>
+              <div class="step-sub">2.1 KB · no &lt;script&gt; · no on*= · no javascript:</div>
+            </div>
+          </div>
+          <div class="step-body">
+<pre><span class="k">import</span> { validateSVG } <span class="k">from</span> <span class="s">"./agent/scripts/validate-svg"</span>;
+
+<span class="k">const</span> v = validateSVG(svg);
+<span class="c">// → { ok: true, errors: [], sizeBytes: 2153 }</span>
+
+<span class="k">if</span> (!v.ok) <span class="k">throw new</span> <span class="k">Error</span>(v.errors.join(<span class="s">"; "</span>));</pre>
+          </div>
+        </div>
+
+        <div class="step" data-step="3">
+          <div class="step-head" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div>
+              <div class="step-title">Send mint transaction on Pharos Mainnet</div>
+              <div class="step-sub">viem · chain 1672 · gas ~218,403</div>
+            </div>
+          </div>
+          <div class="step-body">
+<pre><span class="k">import</span> { createPublicClient, createWalletClient, http, parseAbi, encodeFunctionData }
+  <span class="k">from</span> <span class="s">"viem"</span>;
+<span class="k">import</span> { pharosMainnet } <span class="k">from</span> <span class="s">"./agent/lib/pharos"</span>;
+
+<span class="k">const</span> abi = parseAbi([<span class="s">"function mint(address to, string svg) external returns (uint256)"</span>]);
+
+<span class="k">const</span> data = encodeFunctionData({
+  abi, functionName: <span class="s">"mint"</span>,
+  args: [<span class="s">"0xRecipient"</span>, svg],
+});
+
+<span class="k">const</span> txHash = <span class="k">await</span> walletClient.sendTransaction({
+  account, to: <span class="s">"0xYourCollection"</span>, data, chain: pharosMainnet,
+});
+<span class="c">// → "0x9f3c…a7b1"</span></pre>
+          </div>
+        </div>
+
+        <div class="step" data-step="4">
+          <div class="step-head" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div>
+              <div class="step-title">Confirm + return Pharoscan link</div>
+              <div class="step-sub">block 2,184,103 · status success · token #1</div>
+            </div>
+          </div>
+          <div class="step-body">
+<pre><span class="k">const</span> receipt = <span class="k">await</span> publicClient.waitForTransactionReceipt({ hash: txHash });
+
+<span class="k">return</span> {
+  txHash,
+  tokenId: <span class="s">"1"</span>,
+  to: <span class="s">"0xRecipient"</span>,
+  collection: <span class="s">"0xYourCollection"</span>,
+  explorerUrl: <span class="s">`https://pharosscan.xyz/tx/${txHash}`</span>,
+};</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="api">
+    <div class="wrap">
+      <h2>Contract API</h2>
+      <p class="sub">Surface the agent calls. Full source lives in <code>contracts/</code> in the repo.</p>
+
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th style="width:30%;">Function</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">mint(address to, string svg)</td><td>Mint a token with an onchain SVG. <code>onlyOwner</code>.</td></tr>
+          <tr><td class="mono">mintWithMetadata(to, svg, name, desc)</td><td>Mint with onchain name and description. <code>onlyOwner</code>.</td></tr>
+          <tr><td class="mono">tokenURI(uint256 tokenId)</td><td>Returns <code>data:application/json;base64,…</code> with the SVG embedded as <code>image</code>.</td></tr>
+          <tr><td class="mono">setMetadata(tokenId, name, desc)</td><td>Update the metadata of an existing token. <code>onlyOwner</code>.</td></tr>
+          <tr><td class="mono">totalSupply()</td><td>Number of tokens minted.</td></tr>
+          <tr><td class="mono">createCollection(name, symbol, owner)</td><td><i>SVGMinter</i> — deploy a fresh <code>OnchainSVG</code> in one tx.</td></tr>
+          <tr><td class="mono">mintTo(collection, to, svg)</td><td><i>SVGMinter</i> — convenience helper to mint via the factory.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="gh-banner">
+        <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text);">
+          <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
+        </svg>
+        <div class="txt">
+          <b>Open source on GitHub</b>
+          <div>Every file you see in this demo — and the contracts, agent runtime, and tests behind it — lives in a public repository you can clone, audit, and run.</div>
+        </div>
+        <a class="btn primary" href="https://github.com/Yemiight02/SVGM" target="_blank" rel="noopener">View repo →</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-grid">
+    <div>
+      <b style="color:var(--text);">SVGM</b> — Onchain SVG Minter for Pharos Network
+      <div style="margin-top:4px;">MIT License · No wallet required to view this demo · Read-only walkthrough</div>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/Yemiight02/SVGM" target="_blank" rel="noopener">GitHub repo</a>
+      <a href="https://github.com/Yemiight02/SVGM/blob/main/skills/svgm/SKILL.md" target="_blank" rel="noopener">SKILL.md</a>
+      <a href="https://github.com/Yemiight02/SVGM/tree/main/contracts" target="_blank" rel="noopener">Contracts</a>
+      <a href="https://github.com/Yemiight02/SVGM/tree/main/agent" target="_blank" rel="noopener">Agent runtime</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ---------- SVG generator (mirror of agent/scripts/generate-svg.ts) ---------- */
+function generateSVG(opts) {
+  opts = opts || {};
+  var size = opts.size || 512;
+  var background = opts.background || "#0D0D0D";
+  var palette = (opts.palette && opts.palette.length) ? opts.palette : ["#2F80ED","#FFFFFF","#F5F5F5","#FFD166","#06D6A0"];
+  var shapes = (opts.shapes && opts.shapes.length) ? opts.shapes : ["circle","rect","polygon"];
+  var seed = (opts.seed == null) ? Math.floor(Math.random()*1e6) : Number(opts.seed);
+  var rng = mulberry32(seed);
+  var elements = [];
+  var count = 8 + Math.floor(rng()*8);
+  for (var i=0;i<count;i++){
+    var shape = shapes[Math.floor(rng()*shapes.length)];
+    var color = palette[Math.floor(rng()*palette.length)];
+    elements.push(renderShape(shape, size, rng, color));
+  }
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'">',
+    '  <rect x="0" y="0" width="'+size+'" height="'+size+'" fill="'+esc(background)+'"/>',
+    '  ' + elements.join('\n  '),
+    '</svg>'
+  ].join('\n');
+}
+function renderShape(shape, size, rng, color){
+  var x=Math.floor(rng()*size), y=Math.floor(rng()*size);
+  var r=8+Math.floor(rng()*(size/6));
+  var w=16+Math.floor(rng()*(size/4));
+  var h=16+Math.floor(rng()*(size/4));
+  var op=(0.4+rng()*0.6).toFixed(2);
+  var fill=esc(color);
+  switch(shape){
+    case "circle":   return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'" opacity="'+op+'"/>';
+    case "rect":     return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'" opacity="'+op+'"/>';
+    case "polygon": {
+      var sides = 3 + Math.floor(rng()*4);
+      var pts = [];
+      for (var i=0;i<sides;i++){ var a=Math.PI*2*i/sides; pts.push(Math.round(x+r*Math.cos(a))+','+Math.round(y+r*Math.sin(a))); }
+      return '<polygon points="'+pts.join(' ')+'" fill="'+fill+'" opacity="'+op+'"/>';
+    }
+    case "line":     return '<line x1="'+x+'" y1="'+y+'" x2="'+(x+w)+'" y2="'+(y+h)+'" stroke="'+fill+'" stroke-width="2" opacity="'+op+'"/>';
+    case "path": {
+      var cx=x+w/2, cy=y+h/2;
+      return '<path d="M '+x+' '+cy+' Q '+cx+' '+y+' '+(x+w)+' '+cy+'" stroke="'+fill+'" stroke-width="2" fill="none" opacity="'+op+'"/>';
+    }
+    default:         return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'" opacity="'+op+'"/>';
+  }
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function mulberry32(seed){ var a=seed>>>0; return function(){ a|=0; a=(a+0x6D2B79F5)|0; var t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+
+/* ---------- validator (mirror of agent/scripts/validate-svg.ts) ---------- */
+function validateSVG(input){
+  var errors=[], svg=String(input||"").trim();
+  var sizeBytes = new TextEncoder().encode(svg).length;
+  if (!svg.length) errors.push("SVG is empty");
+  if (!/^<\?xml[^>]*\?>\s*<svg[\s>]/i.test(svg) && !/^<svg[\s>]/i.test(svg)) errors.push("Missing <svg> root element");
+  if (!/xmlns\s*=\s*"http:\/\/www\.w3\.org\/2000\/svg"/.test(svg)) errors.push("Missing xmlns attribute");
+  if (!balanced(svg,"<",">")) errors.push("Unbalanced angle brackets");
+  if (!quoteBalanceOk(svg)) errors.push("Unbalanced quotes");
+  var lower=svg.toLowerCase();
+  if (lower.indexOf("<script")>=0) errors.push("Contains forbidden <script> tag");
+  if (lower.indexOf("javascript:")>=0) errors.push("Contains forbidden javascript: URI");
+  if (/\son[a-z]+\s*=/i.test(svg)) errors.push("Contains forbidden event-handler attribute (on*=)");
+  var max=24576;
+  if (sizeBytes>max) errors.push("SVG too large: "+sizeBytes+" bytes (max "+max+")");
+  return { ok: errors.length===0, errors: errors, sizeBytes: sizeBytes };
+}
+function balanced(s,o,c){var n=0;for(var i=0;i<s.length;i++){if(s[i]===o)n++;else if(s[i]===c)n--;if(n<0)return false;}return n===0;}
+function quoteBalanceOk(s){var d=false, q=false; for(var i=0;i<s.length;i++){var c=s[i]; if(c==="\\"){i++;continue;} if(d){if(c==='"')d=false;} else if(q){if(c==="'")q=false;} else { if(c==='"')d=true; else if(c==="'")q=true; }} return !d && !q;}
+
+/* ---------- UI wiring ---------- */
+function readInputs(){
+  return {
+    shapes:  document.getElementById("shapes").value.split(",").map(s=>s.trim()).filter(Boolean),
+    palette: document.getElementById("palette").value.split(",").map(s=>s.trim()).filter(Boolean),
+    seed:    Number(document.getElementById("seed").value) || 0,
+    size:    Number(document.getElementById("size").value) || 512,
+    background: document.getElementById("bg").value || "#0D0D0D",
+  };
+}
+function runGenerate(){
+  var opts = readInputs();
+  var svg = generateSVG(opts);
+  var v = validateSVG(svg);
+  document.getElementById("preview").innerHTML = svg;
+  var head = svg.length > 240 ? svg.slice(0,240) + "…" : svg;
+  document.getElementById("svgOut").value = head;
+  var status = document.getElementById("status");
+  if (v.ok){
+    status.className = "status ok";
+    status.innerHTML = '<div class="row"><span>✓ valid</span><span>'+v.sizeBytes+' bytes</span><span>'+(opts.seed)+' seed</span><span>'+opts.shapes.length+' shape types</span><span>'+opts.palette.length+' colors</span></div>';
+  } else {
+    status.className = "status bad";
+    status.textContent = "✗ " + v.errors.join("; ");
+  }
+}
+document.getElementById("genBtn").addEventListener("click", runGenerate);
+["shapes","palette","seed","size","bg"].forEach(function(id){
+  document.getElementById(id).addEventListener("input", function(){
+    clearTimeout(window._t); window._t = setTimeout(runGenerate, 220);
+  });
+});
+function toggleStep(head){
+  var step = head.parentElement;
+  step.classList.toggle("open");
+}
+runGenerate();
+</script>
+</body>
+</html>
